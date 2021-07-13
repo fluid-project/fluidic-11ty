@@ -24,7 +24,7 @@ const htmlMinTransform = require("./src/transforms/html-min-transform.js");
 const parseTransform = require("./src/transforms/parse-transform.js");
 
 // Import data files
-const site = require("./src/_data/site.json");
+const siteConfig = require("./src/_data/config.json");
 
 module.exports = function (config) {
     config.setUseGitIgnore(false);
@@ -34,25 +34,37 @@ module.exports = function (config) {
     config.addTransform("parse", parseTransform);
 
     // Passthrough copy
+    config.addPassthroughCopy({"src/admin/config.yml": "admin/config.yml"});
     config.addPassthroughCopy({"src/assets/icons": "/"});
     config.addPassthroughCopy({"src/assets/images": "assets/images"});
     config.addPassthroughCopy({"src/posts/images": "posts/images"});
+
+    config.addNunjucksFilter("getSiblingValue", function (value, inputKey, inputValue, siblingKey) {
+        let siblingValue = false;
+        value.forEach(item => {
+            if (item[inputKey] === inputValue) {
+                siblingValue = item[siblingKey];
+            };
+        });
+
+        return siblingValue;
+    });
 
     const now = new Date();
 
     // Custom collections
     const livePosts = post => post.date <= now && !post.data.draft;
-    config.addCollection("posts", collection => {
-        return [
-            ...collection.getFilteredByGlob("./src/posts/*.md").filter(livePosts)
-        ];
-    });
+    siteConfig.languages.forEach(lang => {
+        config.addCollection(`posts_${lang.code}`, collection => {
+            return collection.getFilteredByGlob(`./src/collections/posts/${lang.code}/*.md`).filter(livePosts);
+        });
 
-    // The following collection is used to create a collection of posts for the RSS feed.
-    config.addCollection("postFeed", collection => {
-        return [...collection.getFilteredByGlob("./src/posts/*.md").filter(livePosts)]
-            .reverse()
-            .slice(0, site.maxPostsInFeed);
+        // The following collection is used to create a collection of posts for the RSS feed.
+        config.addCollection(`postFeed_${lang.code}`, collection => {
+            return collection.getFilteredByGlob(`./src/collections/posts/${lang.code}/*.md`).filter(livePosts)
+                .reverse()
+                .slice(0, siteConfig.maxPostsInFeed);
+        });
     });
 
     // Plugins
